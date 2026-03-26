@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoldOS — Agro Intelligence Suite</title>
+<link href="https://fonts.googleapis.com/css2?family=Varela+Round&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root {
+  --bold-cyan:#06ffe1;--bold-magenta:#f85cff;--bold-black:#0a0a0a;--bold-dark:#141414;
+  --bold-gray-1:#1e1e1e;--bold-gray-2:#2a2a2a;--bold-gray-3:#aaa;--bold-white:#f0f0f0;
+  --sig-up:#00e676;--sig-warn:#ffd740;--sig-alert:#ff9100;--sig-down:#ff5252;--sig-mute:#616161;
+  --font-head:'Varela Round',sans-serif;
+  --font-body:'Avenir Next','Avenir',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --font-mono:'SF Mono','Fira Code','Consolas',monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;background:var(--bold-black);color:var(--bold-white);font-family:var(--font-body);font-size:14px;-webkit-font-smoothing:antialiased;}
+::selection{background:rgba(6,255,225,.25);color:#fff;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--bold-black);}
+::-webkit-scrollbar-thumb{background:var(--bold-gray-2);border-radius:3px;}
+
+/* ── HEADER ── */
+.app-header{position:fixed;top:0;left:0;right:0;z-index:1000;background:var(--bold-black);border-bottom:1px solid var(--bold-gray-1);display:flex;align-items:center;height:56px;padding:0 24px;gap:32px;}
+.logo-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.logo-wrap svg{height:22px;width:auto;}
+.suite-label{font-family:var(--font-body);font-size:11px;color:var(--bold-gray-3);text-transform:uppercase;letter-spacing:2px;border-left:1px solid var(--bold-gray-1);padding-left:12px;}
+.nav-tabs{display:flex;gap:4px;margin-left:16px;}
+.nav-tab{font-family:var(--font-head);font-size:13px;color:var(--bold-gray-3);padding:8px 16px;cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;transition:all .2s;position:relative;white-space:nowrap;}
+.nav-tab:hover{color:var(--bold-white);}
+.nav-tab.active{color:var(--bold-cyan);border-bottom-color:var(--bold-cyan);}
+.nav-tab .tab-num{font-family:var(--font-mono);font-size:10px;color:var(--bold-gray-2);margin-right:6px;}
+.nav-tab.active .tab-num{color:rgba(6,255,225,.4);}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:16px;font-size:12px;color:var(--bold-gray-3);}
+.header-right .campaign{font-family:var(--font-mono);color:var(--bold-cyan);font-size:11px;background:rgba(6,255,225,.08);padding:4px 10px;border-radius:6px;border:1px solid rgba(6,255,225,.15);}
+
+/* ── MAIN ── */
+.app-main{margin-top:56px;padding:24px;min-height:calc(100vh - 56px);}
+.view{display:none;animation:fadeUp .35s ease;}
+.view.active{display:block;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── SECTION TITLES ── */
+.section-title{font-family:var(--font-head);font-size:20px;color:var(--bold-white);margin-bottom:4px;}
+.section-sub{font-size:13px;color:var(--bold-gray-3);margin-bottom:20px;}
+.hud-bracket{position:relative;padding:20px 24px;margin-bottom:24px;}
+.hud-bracket::before,.hud-bracket::after{content:'';position:absolute;width:16px;height:16px;border-color:var(--bold-cyan);border-style:solid;opacity:.3;}
+.hud-bracket::before{top:0;left:0;border-width:2px 0 0 2px;}
+.hud-bracket::after{bottom:0;right:0;border-width:0 2px 2px 0;}
+
+/* ── KPI CARDS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px;}
+.kpi-card{background:var(--bold-dark);border:1px solid var(--bold-gray-1);border-radius:12px;padding:20px;position:relative;overflow:hidden;}
+.kpi-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px;}
+.kpi-card.up::before{background:var(--sig-up);}
+.kpi-card.warn::before{background:var(--sig-warn);}
+.kpi-card.alert::before{background:var(--sig-alert);}
+.kpi-card.down::before{background:var(--sig-down);}
+.kpi-card.cyan::before{background:var(--bold-cyan);}
+.kpi-card.mag::before{background:var(--bold-magenta);}
+.kpi-label{font-size:11px;color:var(--bold-gray-3);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;}
+.kpi-value{font-family:var(--font-mono);font-size:28px;font-weight:700;color:var(--bold-white);line-height:1;}
+.kpi-delta{font-family:var(--font-mono);font-size:12px;margin-top:6px;}
+.kpi-delta.up{color:var(--sig-up);}
+.kpi-delta.down{color:var(--sig-down);}
+.kpi-delta.warn{color:var(--sig-warn);}
+.kpi-unit{font-size:14px;font-weight:400;color:var(--bold-gray-3);margin-left:4px;}
+
+/* ── CARDS & PANELS ── */
+.card{background:var(--bold-dark);border:1px solid var(--bold-gray-1);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 0 20px rgba(6,255,225,.03);}
+.card-title{font-family:var(--font-head);font-size:15px;margin-bottom:14px;color:var(--bold-white);display:flex;align-items:center;gap:8px;}
+.card-title .icon{color:var(--bold-cyan);font-size:16px;}
+
+/* ── GRID ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;}
+.grid-map-right{display:grid;grid-template-columns:1fr 460px;gap:16px;}
+.grid-map-left{display:grid;grid-template-columns:460px 1fr;gap:16px;}
+@media(max-width:1100px){.grid-2,.grid-3,.grid-map-right,.grid-map-left{grid-template-columns:1fr;}}
+
+/* ── TABLES ── */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{background:var(--bold-gray-1);color:var(--bold-gray-3);font-size:11px;text-transform:uppercase;letter-spacing:.5px;padding:10px 12px;text-align:left;font-weight:600;position:sticky;top:0;}
+.tbl td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);}
+.tbl tr:nth-child(even) td{background:rgba(255,255,255,.015);}
+.tbl tr:hover td{background:rgba(6,255,225,.04);}
+.tbl .num{font-family:var(--font-mono);text-align:right;}
+
+/* ── PILLS / BADGES ── */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;border:1px solid;}
+.pill.green{color:var(--sig-up);border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.08);}
+.pill.yellow{color:var(--sig-warn);border-color:rgba(255,215,64,.3);background:rgba(255,215,64,.08);}
+.pill.orange{color:var(--sig-alert);border-color:rgba(255,145,0,.3);background:rgba(255,145,0,.08);}
+.pill.red{color:var(--sig-down);border-color:rgba(255,82,82,.3);background:rgba(255,82,82,.08);}
+.pill.cyan{color:var(--bold-cyan);border-color:rgba(6,255,225,.3);background:rgba(6,255,225,.08);}
+.pill .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+
+/* ── SCORE GAUGE ── */
+.score-wrap{display:flex;align-items:center;gap:20px;}
+.score-circle{width:120px;height:120px;position:relative;flex-shrink:0;}
+.score-circle svg{width:100%;height:100%;transform:rotate(-90deg);}
+.score-circle .bg{fill:none;stroke:var(--bold-gray-1);stroke-width:8;}
+.score-circle .fg{fill:none;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset .8s ease;}
+.score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:32px;font-weight:700;}
+.score-label{font-size:12px;color:var(--bold-gray-3);margin-top:4px;}
+
+/* ── SEMAFORO ROW ── */
+.sem-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:16px 0;}
+.sem-item{display:flex;align-items:center;gap:10px;background:var(--bold-gray-1);border-radius:8px;padding:10px 14px;}
+.sem-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.sem-item .lbl{font-size:12px;color:var(--bold-gray-3);}
+.sem-item .val{font-size:13px;font-weight:600;margin-left:auto;}
+
+/* ── MAP ── */
+#map-container{height:400px;border-radius:12px;overflow:hidden;border:1px solid var(--bold-gray-1);background:var(--bold-dark);}
+.leaflet-container{background:var(--bold-black)!important;}
+
+/* ── FILTERS ── */
+.filter-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center;}
+.filter-bar label{font-size:11px;color:var(--bold-gray-3);text-transform:uppercase;letter-spacing:.5px;}
+.filter-bar select,.filter-bar input[type="text"]{background:var(--bold-gray-1);border:1px solid var(--bold-gray-2);color:var(--bold-white);padding:7px 12px;border-radius:8px;font-size:13px;font-family:var(--font-body);outline:none;min-width:140px;}
+.filter-bar select:focus,.filter-bar input:focus{border-color:var(--bold-cyan);box-shadow:0 0 0 2px rgba(6,255,225,.1);}
+
+/* ── BTN ── */
+.btn{font-family:var(--font-head);font-size:13px;padding:8px 20px;border-radius:8px;cursor:pointer;border:none;transition:all .2s;}
+.btn-primary{background:var(--bold-cyan);color:var(--bold-black);font-weight:600;}
+.btn-primary:hover{box-shadow:0 0 16px rgba(6,255,225,.3);}
+.btn-secondary{background:transparent;border:1px solid var(--bold-cyan);color:var(--bold-cyan);}
+.btn-secondary:hover{background:rgba(6,255,225,.08);}
+
+/* ── FOOTER BADGE ── */
+.boldos-badge{display:flex;align-items:center;gap:8px;padding:12px 20px;background:rgba(6,255,225,.04);border:1px solid rgba(6,255,225,.1);border-radius:10px;font-size:12px;color:var(--bold-white);opacity:.7;margin-top:24px;}
+.boldos-badge .shield{color:var(--bold-cyan);font-size:16px;}
+
+/* ── VERIFY BLOCK ── */
+.verify-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:0;border:1px solid rgba(6,255,225,.15);border-radius:12px;overflow:hidden;}
+.verify-col{padding:16px 20px;}
+.verify-col.declared{background:rgba(255,255,255,.02);}
+.verify-col.vs{display:flex;align-items:center;justify-content:center;background:rgba(6,255,225,.05);padding:0 12px;font-family:var(--font-mono);color:var(--bold-cyan);font-size:11px;}
+.verify-col.detected{background:rgba(6,255,225,.03);}
+.verify-col h4{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--bold-gray-3);margin-bottom:12px;}
+.verify-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;}
+.verify-row:last-child{border:none;}
+.verify-row .vlbl{color:var(--bold-gray-3);}
+.verify-row .vval{font-family:var(--font-mono);font-weight:600;}
+.match{color:var(--sig-up);}
+.mismatch{color:var(--sig-down);}
+
+/* ── ALERTS ── */
+.alert-item{display:flex;gap:12px;padding:12px 16px;border-radius:10px;background:var(--bold-dark);border-left:4px solid;margin-bottom:8px;align-items:flex-start;}
+.alert-item.red{border-color:var(--sig-down);}
+.alert-item.orange{border-color:var(--sig-alert);}
+.alert-item.yellow{border-color:var(--sig-warn);}
+.alert-item .a-icon{font-size:16px;margin-top:2px;flex-shrink:0;}
+.alert-item .a-text{font-size:13px;}
+.alert-item .a-action{font-size:11px;color:var(--bold-cyan);margin-top:4px;cursor:pointer;}
+.alert-item .a-action:hover{text-decoration:underline;}
+
+/* ── DONUT ── */
+.donut-wrap{display:flex;align-items:center;gap:24px;}
+.donut-legend{display:flex;flex-direction:column;gap:6px;}
+.donut-legend-item{display:flex;align-items:center;gap:8px;font-size:12px;}
+.donut-legend-item .dlc{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+
+/* ── INSIGHT BOX ── */
+.insight{background:rgba(248,92,255,.04);border:1px solid rgba(248,92,255,.12);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--bold-white);margin-bottom:12px;display:flex;gap:10px;align-items:flex-start;}
+.insight .i-icon{color:var(--bold-magenta);flex-shrink:0;font-size:16px;}
+
+/* ── CHART ── */
+.mini-chart{margin:12px 0;}
+.mini-chart svg{width:100%;height:auto;}
+
+/* ── DRILL CLIENT ── */
+.client-header{display:flex;align-items:center;gap:16px;padding:16px 20px;background:var(--bold-dark);border:1px solid var(--bold-gray-1);border-radius:12px;margin-bottom:20px;}
+.client-avatar{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--bold-cyan),var(--bold-magenta));display:flex;align-items:center;justify-content:center;font-family:var(--font-head);font-size:18px;color:var(--bold-black);font-weight:700;flex-shrink:0;}
+.client-info h3{font-family:var(--font-head);font-size:16px;}
+.client-info .meta{font-size:12px;color:var(--bold-gray-3);margin-top:2px;}
+
+/* ── MISC ── */
+.text-cyan{color:var(--bold-cyan);}
+.text-mag{color:var(--bold-magenta);}
+.text-muted{color:var(--bold-gray-3);}
+.text-up{color:var(--sig-up);}
+.text-down{color:var(--sig-down);}
+.mt-16{margin-top:16px;}
+.mb-8{margin-bottom:8px;}
+.mb-16{margin-bottom:16px;}
+.flex-between{display:flex;justify-content:space-between;align-items:center;}
+.gap-8{gap:8px;}
+.tbl-scroll{max-height:400px;overflow-y:auto;overflow-x:hidden;border-radius:8px;}
+.hidden{display:none!important;}
+</style>
+</head>
+<body>
+
+<!-- ═══ HEADER ═══ -->
+<header class="app-header">
+  <div class="logo-wrap">
+    <svg viewBox="0 0 120 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="22" font-family="'Varela Round',sans-serif" font-size="26" font-weight="400" fill="#06ffe1" letter-spacing="4">BOLD</text>
+      <polygon points="105,6 115,14 105,22" fill="#06ffe1"/>
+    </svg>
+    <span class="suite-label">Agro Intelligence</span>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-view="oportunidad"><span class="tab-num">01</span>Oportunidad</button>
+    <button class="nav-tab" data-view="precalificacion"><span class="tab-num">02</span>Precalificación</button>
+    <button class="nav-tab" data-view="evaluacion"><span class="tab-num">03</span>Evaluación</button>
+    <button class="nav-tab" data-view="cartera"><span class="tab-num">04</span>Cartera</button>
+  </nav>
+  <div class="header-right">
+    <span class="campaign">Campaña 2024/25</span>
+    <span id="header-date"></span>
+  </div>
+</header>
+
+<!-- ═══ VIEWS ═══ -->
+<main class="app-main">
+
+<!-- ▸▸▸ VIEW 1: OPORTUNIDAD ▸▸▸ -->
+<section id="view-oportunidad" class="view active"></section>
+
+<!-- ▸▸▸ VIEW 2: PRECALIFICACIÓN ▸▸▸ -->
+<section id="view-precalificacion" class="view"></section>
+
+<!-- ▸▸▸ VIEW 3: EVALUACIÓN ▸▸▸ -->
+<section id="view-evaluacion" class="view"></section>
+
+<!-- ▸▸▸ VIEW 4: CARTERA ▸▸▸ -->
+<section id="view-cartera" class="view"></section>
+
+</main>
+
+<script>
+// ══════════════════════════════════════════════════════
+// MOCK DATA
+// ══════════════════════════════════════════════════════
+const CROPS={soja:{label:'Soja',color:'#00e676',price:320},maiz:{label:'Maíz',color:'#ffd740',price:185},trigo:{label:'Trigo',color:'#8D6E63',price:230},girasol:{label:'Girasol',color:'#ff9100',price:410},cebada:{label:'Cebada',color:'#9E9D24',price:210}};
+const BENCHMARKS={'Pergamino':{soja:38,maiz:95,trigo:42,girasol:24},'Marcos Juárez':{soja:40,maiz:100,trigo:45,girasol:26},'General López':{soja:37,maiz:92,trigo:41,girasol:23},'Paraná':{soja:32,maiz:78,trigo:35,girasol:19},'Quemú Quemú':{soja:28,maiz:70,trigo:30,girasol:17},'Unión':{soja:35,maiz:85,trigo:38,girasol:21},'Río Cuarto':{soja:30,maiz:75,trigo:33,girasol:18},'Caseros':{soja:36,maiz:88,trigo:39,girasol:22}};
+
+const PROVINCES={
+  'Buenos Aires':{deptos:['Pergamino','Junín','Rojas','Salto','Colón'],lat:-33.9,lng:-60.6},
+  'Córdoba':{deptos:['Marcos Juárez','Unión','Río Cuarto','Gral. San Martín','Tercero Arriba'],lat:-32.4,lng:-63.2},
+  'Santa Fe':{deptos:['General López','Caseros','Constitución','Belgrano','Iriondo'],lat:-33.5,lng:-61.5},
+  'Entre Ríos':{deptos:['Paraná','Diamante','Victoria','Gualeguaychú'],lat:-31.7,lng:-59.5},
+  'La Pampa':{deptos:['Quemú Quemú','Maracó','Catriló'],lat:-36.2,lng:-64.0}
+};
+
+const DEPTO_COORDS={'Pergamino':[-33.89,-60.57],'Junín':[-34.59,-60.95],'Rojas':[-34.2,-60.73],'Salto':[-34.29,-60.25],'Colón':[-33.89,-61.1],'Marcos Juárez':[-32.69,-62.1],'Unión':[-32.58,-62.89],'Río Cuarto':[-33.13,-64.35],'Gral. San Martín':[-32.09,-63.29],'Tercero Arriba':[-32.38,-63.63],'General López':[-33.72,-61.95],'Caseros':[-33.04,-61.16],'Constitución':[-33.23,-60.85],'Belgrano':[-32.62,-61.51],'Iriondo':[-32.67,-61.17],'Paraná':[-31.73,-60.53],'Diamante':[-32.07,-60.64],'Victoria':[-32.62,-60.15],'Gualeguaychú':[-33.01,-58.52],'Quemú Quemú':[-36.06,-63.56],'Maracó':[-35.69,-63.75],'Catriló':[-36.41,-63.42]};
+
+// Opportunity data per departamento
+const DEPTO_DATA={};
+Object.keys(DEPTO_COORDS).forEach(d=>{
+  const bm=BENCHMARKS[d]||{soja:33,maiz:82,trigo:37,girasol:20};
+  const ha=Math.floor(1500+Math.random()*4000);
+  const cropDist={soja:.45,maiz:.3,trigo:.15,girasol:.1};
+  let valProd=0;
+  Object.entries(cropDist).forEach(([c,pct])=>{
+    const rend=bm[c]||30;
+    valProd+=ha*pct*rend/10*CROPS[c].price;
+  });
+  DEPTO_DATA[d]={ha,valProd:Math.round(valProd),cropDist,dominante:'soja',benchmark:bm,oportunidad:Math.round(valProd*.35)};
+});
+
+// Clientes mock
+const CLIENTS=[
+  {id:1,name:'Agropecuaria Los Álamos',cuit:'30-71234567-8',prov:'Córdoba',depto:'Marcos Juárez',contacto:'Carlos Méndez',
+   lotes:[
+     {name:'Lote Norte',ha:420,crop:'soja',prev:'maiz',proj:'trigo',yH:38,yC:42,yP:40,ws:'low',cond:'excellent',ndvi:.82,rotation:true,siembra:'2024-11-12'},
+     {name:'Lote Sur',ha:310,crop:'maiz',prev:'soja',proj:'soja',yH:95,yC:102,yP:98,ws:'low',cond:'good',ndvi:.78,rotation:true,siembra:'2024-10-05'},
+     {name:'Lote Oeste',ha:190,crop:'trigo',prev:'soja',proj:'soja',yH:42,yC:44,yP:43,ws:'moderate',cond:'good',ndvi:.71,rotation:true,siembra:'2024-06-15'},
+   ],
+   score:82,creditoTomado:280000,capProductiva:520000,deudaActual:.35,cobertura:1.86,sustentabilidad:'alta',practicas:'buenas',historial:'excelente',
+   declared:{ha_total:920,crop_principal:'Soja',rinde_soja:'38 qq/ha',rinde_maiz:'95 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:920,crop_principal:'Soja',rinde_soja:'42 qq/ha',rinde_maiz:'102 qq/ha',rotacion:'Sí'}
+  },
+  {id:2,name:'Estancia Don Pedro',cuit:'20-28765432-1',prov:'Santa Fe',depto:'General López',contacto:'María Gutiérrez',
+   lotes:[
+     {name:'Campo Grande',ha:650,crop:'soja',prev:'trigo',proj:'maiz',yH:37,yC:35,yP:36,ws:'moderate',cond:'fair',ndvi:.65,rotation:true,siembra:'2024-11-20'},
+     {name:'Potrero Nuevo',ha:280,crop:'girasol',prev:'soja',proj:'trigo',yH:23,yC:20,yP:22,ws:'high',cond:'poor',ndvi:.52,rotation:false,siembra:'2024-10-28'},
+   ],
+   score:61,creditoTomado:200000,capProductiva:310000,deudaActual:.52,cobertura:1.55,sustentabilidad:'media',practicas:'regulares',historial:'bueno',
+   declared:{ha_total:930,crop_principal:'Soja',rinde_soja:'40 qq/ha',rinde_maiz:'—',rotacion:'Sí'},
+   detected:{ha_total:930,crop_principal:'Soja',rinde_soja:'35 qq/ha',rinde_maiz:'—',rotacion:'Parcial'}
+  },
+  {id:3,name:'Campos del Sur SA',cuit:'30-65432198-0',prov:'Buenos Aires',depto:'Pergamino',contacto:'Roberto Ansaldi',
+   lotes:[
+     {name:'Lote A',ha:380,crop:'soja',prev:'soja',proj:'soja',yH:38,yC:28,yP:30,ws:'high',cond:'poor',ndvi:.45,rotation:false,siembra:'2024-11-28'},
+     {name:'Lote B',ha:290,crop:'maiz',prev:'maiz',proj:'soja',yH:95,yC:68,yP:72,ws:'high',cond:'poor',ndvi:.42,rotation:false,siembra:'2024-10-15'},
+     {name:'Lote C',ha:180,crop:'soja',prev:'soja',proj:'maiz',yH:38,yC:30,yP:32,ws:'moderate',cond:'fair',ndvi:.55,rotation:false,siembra:'2024-12-01'},
+   ],
+   score:34,creditoTomado:420000,capProductiva:160000,deudaActual:.82,cobertura:.38,sustentabilidad:'baja',practicas:'malas',historial:'irregular',
+   declared:{ha_total:850,crop_principal:'Soja',rinde_soja:'38 qq/ha',rinde_maiz:'90 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:850,crop_principal:'Soja',rinde_soja:'28 qq/ha',rinde_maiz:'68 qq/ha',rotacion:'No'}
+  },
+  {id:4,name:'Las Margaritas SRL',cuit:'30-44567890-5',prov:'Entre Ríos',depto:'Paraná',contacto:'Ana Domínguez',
+   lotes:[
+     {name:'Parcela 1',ha:310,crop:'soja',prev:'trigo',proj:'maiz',yH:32,yC:34,yP:33,ws:'low',cond:'good',ndvi:.75,rotation:true,siembra:'2024-11-08'},
+     {name:'Parcela 2',ha:220,crop:'maiz',prev:'soja',proj:'trigo',yH:78,yC:80,yP:79,ws:'low',cond:'good',ndvi:.73,rotation:true,siembra:'2024-09-25'},
+   ],
+   score:74,creditoTomado:150000,capProductiva:280000,deudaActual:.38,cobertura:1.87,sustentabilidad:'alta',practicas:'buenas',historial:'bueno',
+   declared:{ha_total:530,crop_principal:'Soja',rinde_soja:'32 qq/ha',rinde_maiz:'78 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:530,crop_principal:'Soja',rinde_soja:'34 qq/ha',rinde_maiz:'80 qq/ha',rotacion:'Sí'}
+  },
+  {id:5,name:'Agro Pampeana SA',cuit:'30-55678901-2',prov:'La Pampa',depto:'Quemú Quemú',contacto:'Fernando Lagos',
+   lotes:[
+     {name:'Cuartel 1',ha:520,crop:'soja',prev:'girasol',proj:'trigo',yH:28,yC:26,yP:27,ws:'moderate',cond:'fair',ndvi:.62,rotation:true,siembra:'2024-11-18'},
+     {name:'Cuartel 2',ha:410,crop:'maiz',prev:'soja',proj:'soja',yH:70,yC:65,yP:68,ws:'moderate',cond:'fair',ndvi:.60,rotation:true,siembra:'2024-10-10'},
+   ],
+   score:55,creditoTomado:190000,capProductiva:240000,deudaActual:.55,cobertura:1.26,sustentabilidad:'media',practicas:'regulares',historial:'regular',
+   declared:{ha_total:930,crop_principal:'Soja',rinde_soja:'30 qq/ha',rinde_maiz:'72 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:930,crop_principal:'Soja',rinde_soja:'26 qq/ha',rinde_maiz:'65 qq/ha',rotacion:'Sí'}
+  },
+  {id:6,name:'Santa Clara Agro',cuit:'30-77890123-4',prov:'Córdoba',depto:'Unión',contacto:'Lucía Pereyra',
+   lotes:[
+     {name:'Lote Laguna',ha:340,crop:'soja',prev:'maiz',proj:'trigo',yH:35,yC:37,yP:36,ws:'low',cond:'excellent',ndvi:.84,rotation:true,siembra:'2024-11-05'},
+     {name:'Lote Alto',ha:260,crop:'maiz',prev:'trigo',proj:'soja',yH:85,yC:90,yP:88,ws:'low',cond:'good',ndvi:.77,rotation:true,siembra:'2024-09-28'},
+   ],
+   score:79,creditoTomado:170000,capProductiva:350000,deudaActual:.32,cobertura:2.06,sustentabilidad:'alta',practicas:'buenas',historial:'excelente',
+   declared:{ha_total:600,crop_principal:'Soja',rinde_soja:'35 qq/ha',rinde_maiz:'85 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:600,crop_principal:'Soja',rinde_soja:'37 qq/ha',rinde_maiz:'90 qq/ha',rotacion:'Sí'}
+  },
+  {id:7,name:'Trigales del Litoral',cuit:'20-33456789-6',prov:'Santa Fe',depto:'Caseros',contacto:'Julio Martínez',
+   lotes:[
+     {name:'Campo Norte',ha:480,crop:'trigo',prev:'soja',proj:'soja',yH:39,yC:41,yP:40,ws:'low',cond:'good',ndvi:.76,rotation:true,siembra:'2024-06-20'},
+     {name:'Campo Sur',ha:350,crop:'soja',prev:'trigo',proj:'maiz',yH:36,yC:38,yP:37,ws:'low',cond:'good',ndvi:.74,rotation:true,siembra:'2024-11-15'},
+   ],
+   score:76,creditoTomado:200000,capProductiva:380000,deudaActual:.40,cobertura:1.90,sustentabilidad:'alta',practicas:'buenas',historial:'bueno',
+   declared:{ha_total:830,crop_principal:'Trigo',rinde_trigo:'39 qq/ha',rinde_soja:'36 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:830,crop_principal:'Trigo',rinde_trigo:'41 qq/ha',rinde_soja:'38 qq/ha',rotacion:'Sí'}
+  },
+  {id:8,name:'El Porvenir SRL',cuit:'30-88901234-7',prov:'Buenos Aires',depto:'Junín',contacto:'Diego Sánchez',
+   lotes:[
+     {name:'Parcela Principal',ha:560,crop:'soja',prev:'maiz',proj:'trigo',yH:36,yC:33,yP:34,ws:'moderate',cond:'fair',ndvi:.61,rotation:true,siembra:'2024-11-22'},
+   ],
+   score:58,creditoTomado:250000,capProductiva:290000,deudaActual:.60,cobertura:1.16,sustentabilidad:'media',practicas:'regulares',historial:'regular',
+   declared:{ha_total:560,crop_principal:'Soja',rinde_soja:'38 qq/ha',rinde_maiz:'—',rotacion:'Sí'},
+   detected:{ha_total:560,crop_principal:'Soja',rinde_soja:'33 qq/ha',rinde_maiz:'—',rotacion:'Sí'}
+  },
+  {id:9,name:'Agroservicios Colón',cuit:'30-99012345-8',prov:'Buenos Aires',depto:'Colón',contacto:'Patricia Herrera',
+   lotes:[
+     {name:'Lote 1',ha:290,crop:'maiz',prev:'soja',proj:'soja',yH:92,yC:88,yP:90,ws:'low',cond:'good',ndvi:.74,rotation:true,siembra:'2024-10-02'},
+     {name:'Lote 2',ha:210,crop:'soja',prev:'maiz',proj:'trigo',yH:37,yC:39,yP:38,ws:'low',cond:'good',ndvi:.76,rotation:true,siembra:'2024-11-10'},
+   ],
+   score:71,creditoTomado:140000,capProductiva:270000,deudaActual:.35,cobertura:1.93,sustentabilidad:'alta',practicas:'buenas',historial:'bueno',
+   declared:{ha_total:500,crop_principal:'Maíz',rinde_maiz:'92 qq/ha',rinde_soja:'37 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:500,crop_principal:'Maíz',rinde_maiz:'88 qq/ha',rinde_soja:'39 qq/ha',rotacion:'Sí'}
+  },
+  {id:10,name:'La Esperanza de Catriló',cuit:'20-11234567-3',prov:'La Pampa',depto:'Catriló',contacto:'Martín Vega',
+   lotes:[
+     {name:'Campo Principal',ha:680,crop:'soja',prev:'girasol',proj:'maiz',yH:26,yC:24,yP:25,ws:'high',cond:'fair',ndvi:.58,rotation:true,siembra:'2024-11-25'},
+     {name:'Potrero Chico',ha:220,crop:'girasol',prev:'soja',proj:'soja',yH:16,yC:14,yP:15,ws:'high',cond:'poor',ndvi:.48,rotation:false,siembra:'2024-10-30'},
+   ],
+   score:42,creditoTomado:180000,capProductiva:150000,deudaActual:.72,cobertura:.83,sustentabilidad:'baja',practicas:'regulares',historial:'regular',
+   declared:{ha_total:900,crop_principal:'Soja',rinde_soja:'28 qq/ha',rinde_girasol:'18 qq/ha',rotacion:'Sí'},
+   detected:{ha_total:900,crop_principal:'Soja',rinde_soja:'24 qq/ha',rinde_girasol:'14 qq/ha',rotacion:'Parcial'}
+  }
+];
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+const fmt=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(0)+'K':n.toString();
+const fmtUSD=n=>'USD '+fmt(n);
+const fmtNum=n=>n.toLocaleString('es-AR');
+const scoreColor=s=>s>=75?'var(--sig-up)':s>=55?'var(--sig-warn)':s>=40?'var(--sig-alert)':'var(--sig-down)';
+const scorePill=s=>s>=75?'green':s>=55?'yellow':s>=40?'orange':'red';
+const scoreLabel=s=>s>=75?'Bajo Riesgo':s>=55?'Riesgo Moderado':s>=40?'Riesgo Elevado':'Riesgo Crítico';
+const condColor=c=>({excellent:'var(--sig-up)',good:'var(--sig-up)',fair:'var(--sig-warn)',poor:'var(--sig-down)'})[c]||'var(--sig-mute)';
+const condLabel=c=>({excellent:'Excelente',good:'Buena',fair:'Regular',poor:'Deficiente'})[c]||'—';
+const wsLabel=w=>({low:'Bajo',moderate:'Moderado',high:'Alto'})[w]||'—';
+const wsColor=w=>({low:'var(--sig-up)',moderate:'var(--sig-warn)',high:'var(--sig-down)'})[w]||'var(--sig-mute)';
+const sustColor=s=>({alta:'var(--sig-up)',media:'var(--sig-warn)',baja:'var(--sig-down)'})[s];
+
+function clientCapProd(c){
+  let total=0;
+  c.lotes.forEach(l=>{
+    const price=CROPS[l.crop]?.price||300;
+    total+=l.ha*l.yC/10*price;
+  });
+  return Math.round(total);
+}
+
+function badgeHTML(){
+  return `<div class="boldos-badge"><span class="shield">🛡</span> Información obtenida por sensorización BoldOS — sin intervención del productor</div>`;
+}
+
+function scoreCircleSVG(val,size=120){
+  const r=48,circ=2*Math.PI*r,off=circ*(1-val/100);
+  const col=scoreColor(val);
+  return `<div class="score-circle" style="width:${size}px;height:${size}px">
+    <svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="${r}"/><circle class="fg" cx="60" cy="60" r="${r}" stroke="${col}" stroke-dasharray="${circ}" stroke-dashoffset="${off}"/></svg>
+    <div class="score-num" style="color:${col}">${val}</div></div>`;
+}
+
+// ══════════════════════════════════════════════════════
+// MAP (shared)
+// ══════════════════════════════════════════════════════
+let map=null,mapLayers=[];
+function initMap(containerId){
+  if(map){map.remove();map=null;}
+  const el=document.getElementById(containerId);
+  if(!el)return;
+  map=L.map(containerId,{zoomControl:true,attributionControl:false}).setView([-33.5,-62],6);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:18}).addTo(map);
+  setTimeout(()=>map.invalidateSize(),100);
+  setTimeout(()=>map.invalidateSize(),400);
+  setTimeout(()=>map.invalidateSize(),1000);
+}
+function clearMapLayers(){mapLayers.forEach(l=>map.removeLayer(l));mapLayers=[];}
+
+// ══════════════════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════════════════
+const views=['oportunidad','precalificacion','evaluacion','cartera'];
+let currentView='oportunidad';
+
+function switchView(v){
+  currentView=v;
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
+  document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id==='view-'+v));
+  history.pushState(null,null,'#'+v);
+  renderView(v);
+}
+
+document.querySelectorAll('.nav-tab').forEach(t=>t.addEventListener('click',()=>switchView(t.dataset.view)));
+window.addEventListener('popstate',()=>{const h=location.hash.slice(1);if(views.includes(h))switchView(h);});
+
+// ══════════════════════════════════════════════════════
+// RENDER VIEWS
+// ══════════════════════════════════════════════════════
+function renderView(v){
+  const el=document.getElementById('view-'+v);
+  if(v==='oportunidad')renderOportunidad(el);
+  else if(v==='precalificacion')renderPrecalificacion(el);
+  else if(v==='evaluacion')renderEvaluacion(el);
+  else if(v==='cartera')renderCartera(el);
+}
+
+// ── VIEW 1: OPORTUNIDAD ──
+function renderOportunidad(el){
+  const allDeptos=Object.keys(DEPTO_DATA);
+  const totalHa=allDeptos.reduce((s,d)=>s+DEPTO_DATA[d].ha,0);
+  const totalVal=allDeptos.reduce((s,d)=>s+DEPTO_DATA[d].valProd,0);
+  const totalOp=allDeptos.reduce((s,d)=>s+DEPTO_DATA[d].oportunidad,0);
+
+  el.innerHTML=`
+    <div class="hud-bracket">
+      <div class="section-title">Estimación de Oportunidad</div>
+      <div class="section-sub">Identificá zonas de alto valor productivo para colocación de crédito agro — sin depender del ejecutivo.</div>
+    </div>
+    <div class="filter-bar">
+      <label>Provincia</label>
+      <select id="f-prov"><option value="">Todas</option>${Object.keys(PROVINCES).map(p=>`<option>${p}</option>`).join('')}</select>
+      <label>Cultivo</label>
+      <select id="f-crop"><option value="">Todos</option>${Object.keys(CROPS).map(c=>`<option value="${c}">${CROPS[c].label}</option>`).join('')}</select>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-card cyan"><div class="kpi-label">Superficie Total</div><div class="kpi-value">${fmtNum(totalHa)}<span class="kpi-unit">ha</span></div></div>
+      <div class="kpi-card up"><div class="kpi-label">Valor Productivo</div><div class="kpi-value">${fmtUSD(totalVal)}</div></div>
+      <div class="kpi-card mag"><div class="kpi-label">Oportunidad de Colocación</div><div class="kpi-value">${fmtUSD(totalOp)}</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Cultivo Dominante</div><div class="kpi-value" style="font-size:22px;color:${CROPS.soja.color}">Soja</div></div>
+    </div>
+    <div class="grid-map-right">
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◉</span> Mapa de Oportunidad por Departamento</div>
+          <div id="map-container"></div>
+        </div>
+        <div class="insight"><span class="i-icon">⚡</span> <span><strong>Marcos Juárez:</strong> ${fmtUSD(DEPTO_DATA['Marcos Juárez'].valProd)} de valor productivo, ${fmtUSD(DEPTO_DATA['Marcos Juárez'].oportunidad)} de oportunidad de colocación — 0% cobertura crediticia actual detectada.</span></div>
+        <div class="insight"><span class="i-icon">⚡</span> <span><strong>Pergamino:</strong> Rendimientos de soja por encima del benchmark zonal. Zona de alta productividad con demanda de financiamiento estacional.</span></div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">📊</span> Comparativa por Departamento</div>
+          <div class="tbl-scroll">
+            <table class="tbl" id="oport-table">
+              <thead><tr><th>Departamento</th><th>Prov.</th><th class="num">Superficie</th><th class="num">Valor Prod.</th><th class="num">Crédito Pot.</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${badgeHTML()}
+  `;
+  // populate table
+  const tbody=el.querySelector('#oport-table tbody');
+  const provAbbr={'Buenos Aires':'BA','Córdoba':'CBA','Santa Fe':'SF','Entre Ríos':'ER','La Pampa':'LP'};
+  allDeptos.sort((a,b)=>DEPTO_DATA[b].valProd-DEPTO_DATA[a].valProd).forEach(d=>{
+    const dd=DEPTO_DATA[d];
+    const prov=Object.entries(PROVINCES).find(([,v])=>v.deptos.includes(d));
+    const pName=prov?provAbbr[prov[0]]||prov[0]:'—';
+    tbody.innerHTML+=`<tr><td>${d}</td><td>${pName}</td><td class="num">${fmtNum(dd.ha)} ha</td><td class="num">${fmtUSD(dd.valProd)}</td><td class="num text-cyan">${fmtUSD(dd.oportunidad)}</td></tr>`;
+  });
+  // map
+  setTimeout(()=>{
+    initMap('map-container');
+    if(!map)return;
+    allDeptos.forEach(d=>{
+      const dd=DEPTO_DATA[d];
+      const coords=DEPTO_COORDS[d];
+      if(!coords)return;
+      const radius=Math.sqrt(dd.ha)*120;
+      const c=L.circleMarker(coords,{radius:Math.max(8,radius/300),fillColor:'#06ffe1',fillOpacity:.35,color:'#06ffe1',weight:1,opacity:.6}).addTo(map);
+      c.bindPopup(`<div style="font-family:var(--font-body);font-size:13px"><strong>${d}</strong><br>${fmtNum(dd.ha)} ha<br>Valor: ${fmtUSD(dd.valProd)}<br>Oportunidad: <span style="color:#06ffe1">${fmtUSD(dd.oportunidad)}</span></div>`);
+      mapLayers.push(c);
+    });
+  },300);
+}
+
+// ── VIEW 2: PRECALIFICACIÓN ──
+function renderPrecalificacion(el,clientId){
+  const client=CLIENTS.find(c=>c.id===(clientId||1));
+  const capProd=clientCapProd(client);
+
+  el.innerHTML=`
+    <div class="hud-bracket">
+      <div class="section-title">Precalificación Crediticia</div>
+      <div class="section-sub">Verificá la capacidad de repago antes de pedir un solo documento al productor.</div>
+    </div>
+    <div class="filter-bar">
+      <label>Cliente</label>
+      <select id="f-client">${CLIENTS.map(c=>`<option value="${c.id}" ${c.id===client.id?'selected':''}>${c.name}</option>`).join('')}</select>
+    </div>
+    <div class="client-header">
+      <div class="client-avatar">${client.name.split(' ').map(w=>w[0]).slice(0,2).join('')}</div>
+      <div class="client-info">
+        <h3>${client.name}</h3>
+        <div class="meta">CUIT ${client.cuit} · ${client.depto}, ${client.prov} · Contacto: ${client.contacto}</div>
+      </div>
+      <div style="margin-left:auto"><span class="pill ${scorePill(client.score)}"><span class="dot"></span>${scoreLabel(client.score)}</span></div>
+    </div>
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◎</span> Score de Riesgo Crediticio</div>
+          <div class="score-wrap">
+            ${scoreCircleSVG(client.score)}
+            <div>
+              <div class="score-label">${scoreLabel(client.score)}</div>
+              <div style="font-size:12px;color:var(--bold-gray-3);margin-top:8px;">Basado en sensorización multitemporal,<br>rotación, rendimiento y estrés hídrico.</div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◆</span> Semáforos por Dimensión</div>
+          <div class="sem-row">
+            <div class="sem-item"><div class="sem-dot" style="background:${condColor(client.lotes[0].cond)}"></div><span class="lbl">Condición</span><span class="val" style="color:${condColor(client.lotes[0].cond)}">${condLabel(client.lotes[0].cond)}</span></div>
+            <div class="sem-item"><div class="sem-dot" style="background:${wsColor(client.lotes[0].ws)}"></div><span class="lbl">Estrés Hídrico</span><span class="val" style="color:${wsColor(client.lotes[0].ws)}">${wsLabel(client.lotes[0].ws)}</span></div>
+            <div class="sem-item"><div class="sem-dot" style="background:${client.lotes[0].rotation?'var(--sig-up)':'var(--sig-down)'}"></div><span class="lbl">Rotación</span><span class="val" style="color:${client.lotes[0].rotation?'var(--sig-up)':'var(--sig-down)'}">${client.lotes[0].rotation?'Sí':'No'}</span></div>
+            <div class="sem-item"><div class="sem-dot" style="background:${sustColor(client.sustentabilidad)}"></div><span class="lbl">Sustentabilidad</span><span class="val" style="color:${sustColor(client.sustentabilidad)}">${client.sustentabilidad.charAt(0).toUpperCase()+client.sustentabilidad.slice(1)}</span></div>
+          </div>
+        </div>
+        <div class="kpi-row" style="grid-template-columns:1fr 1fr">
+          <div class="kpi-card up"><div class="kpi-label">Capacidad de Repago Estimada</div><div class="kpi-value">${fmtUSD(capProd)}</div></div>
+          <div class="kpi-card ${client.cobertura>=1?'up':'down'}"><div class="kpi-label">Ratio de Cobertura</div><div class="kpi-value">${client.cobertura.toFixed(2)}x</div><div class="kpi-delta ${client.cobertura>=1?'up':'down'}">${client.cobertura>=1?'▲ Cobertura suficiente':'▼ Cobertura insuficiente'}</div></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon" style="color:var(--bold-magenta)">⚡</span> Verificación vs DDJJ — Killer Feature</div>
+          <div class="verify-grid">
+            <div class="verify-col declared">
+              <h4>Declarado por productor</h4>
+              ${Object.entries(client.declared).map(([k,v])=>`<div class="verify-row"><span class="vlbl">${k.replace(/_/g,' ')}</span><span class="vval">${v}</span></div>`).join('')}
+            </div>
+            <div class="verify-col vs">VS</div>
+            <div class="verify-col detected">
+              <h4>Detectado por BoldOS</h4>
+              ${Object.entries(client.detected).map(([k,v],i)=>{
+                const dk=Object.keys(client.declared)[i];
+                const dv=Object.values(client.declared)[i];
+                const match=v===dv;
+                return `<div class="verify-row"><span class="vlbl">${k.replace(/_/g,' ')}</span><span class="vval ${match?'match':'mismatch'}">${v} ${match?'✓':'⚠'}</span></div>`;
+              }).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◉</span> Lotes del Cliente</div>
+          <div class="tbl-scroll">
+            <table class="tbl">
+              <thead><tr><th>Lote</th><th class="num">Ha</th><th>Cultivo</th><th class="num">Rinde</th><th>Cond.</th><th>Estrés</th></tr></thead>
+              <tbody>
+                ${client.lotes.map(l=>`<tr>
+                  <td>${l.name}</td><td class="num">${l.ha}</td><td><span style="color:${CROPS[l.crop]?.color||'#fff'}">${CROPS[l.crop]?.label||l.crop}</span></td>
+                  <td class="num">${l.yC} qq/ha</td><td><span style="color:${condColor(l.cond)}">${condLabel(l.cond)}</span></td><td><span style="color:${wsColor(l.ws)}">${wsLabel(l.ws)}</span></td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${badgeHTML()}
+  `;
+  el.querySelector('#f-client').addEventListener('change',e=>renderPrecalificacion(el,parseInt(e.target.value)));
+}
+
+// ── VIEW 3: EVALUACIÓN ──
+function renderEvaluacion(el,clientId){
+  const client=CLIENTS.find(c=>c.id===(clientId||1));
+  const capProd=clientCapProd(client);
+  const signalBadge=client.score>=75?'green':client.score>=55?'yellow':client.score>=40?'orange':'red';
+  const signalText=client.score>=75?'Señal Positiva':client.score>=55?'Señal Neutra':client.score>=40?'Señal de Atención':'Señal Negativa';
+
+  // trend data (mock 90 days)
+  const trendData=[];
+  for(let i=0;i<12;i++){const d=new Date(2024,9,1);d.setDate(d.getDate()+i*8);trendData.push({date:d,ndvi:.55+Math.random()*.3-i*.005+(client.score>60?.1:-.05)});}
+  const tW=360,tH=100,pts=trendData.map((d,i)=>`${10+i*(tW-20)/(trendData.length-1)},${tH-10-(d.ndvi-.3)*tH/.6}`).join(' ');
+  const trendSVG=`<svg viewBox="0 0 ${tW} ${tH+20}" xmlns="http://www.w3.org/2000/svg">
+    <line x1="10" y1="${tH-10}" x2="${tW-10}" y2="${tH-10}" stroke="#2a2a2a" stroke-width="1"/>
+    <polyline points="${pts}" fill="none" stroke="#06ffe1" stroke-width="2" stroke-linejoin="round"/>
+    <text x="10" y="${tH+16}" fill="#888" font-size="9" font-family="var(--font-mono)">Oct</text>
+    <text x="${tW/3}" y="${tH+16}" fill="#888" font-size="9" font-family="var(--font-mono)">Nov</text>
+    <text x="${2*tW/3}" y="${tH+16}" fill="#888" font-size="9" font-family="var(--font-mono)">Dic</text>
+    <text x="${tW-30}" y="${tH+16}" fill="#888" font-size="9" font-family="var(--font-mono)">Ene</text>
+  </svg>`;
+
+  const alerts=[];
+  client.lotes.forEach(l=>{
+    if(l.ws==='high')alerts.push({type:'red',icon:'🔴',text:`${l.name}: estrés hídrico alto detectado. Riesgo de pérdida de rendimiento.`,action:'Solicitar garantía adicional'});
+    if(!l.rotation)alerts.push({type:'orange',icon:'🟠',text:`${l.name}: sin rotación detectada — monocultivo de ${CROPS[l.crop]?.label||l.crop}.`,action:'Evaluar sustentabilidad a mediano plazo'});
+    if(l.cond==='poor')alerts.push({type:'red',icon:'🔴',text:`${l.name}: condición deficiente (NDVI ${l.ndvi.toFixed(2)}).`,action:'Revisar garantía asociada'});
+  });
+  if(client.cobertura<1)alerts.push({type:'red',icon:'🔴',text:`Cobertura productiva por debajo de 1.0x (${client.cobertura.toFixed(2)}x). Riesgo de default.`,action:'Contactar cliente para renegociar'});
+
+  el.innerHTML=`
+    <div class="hud-bracket">
+      <div class="section-title">Informe para Comité de Crédito</div>
+      <div class="section-sub">Validación con sensorización BoldOS — información verificable para la toma de decisión.</div>
+    </div>
+    <div class="filter-bar">
+      <label>Cliente</label>
+      <select id="f-client-eval">${CLIENTS.map(c=>`<option value="${c.id}" ${c.id===client.id?'selected':''}>${c.name}</option>`).join('')}</select>
+      <button class="btn btn-primary" onclick="alert('Demo: Informe incluido en legajo digital')">📎 Incluir en legajo</button>
+    </div>
+
+    <div class="card">
+      <div class="flex-between mb-16">
+        <div>
+          <div class="card-title" style="margin-bottom:4px"><span class="icon">◉</span> Resumen Ejecutivo — ${client.name}</div>
+          <div style="font-size:12px;color:var(--bold-gray-3)">CUIT ${client.cuit} · ${client.depto}, ${client.prov} · Campaña 2024/25</div>
+        </div>
+        <span class="pill ${signalBadge}"><span class="dot"></span>${signalText}</span>
+      </div>
+      <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+        <div class="kpi-card cyan"><div class="kpi-label">Score</div><div class="kpi-value">${client.score}<span class="kpi-unit">/100</span></div></div>
+        <div class="kpi-card up"><div class="kpi-label">Cap. Productiva</div><div class="kpi-value">${fmtUSD(capProd)}</div></div>
+        <div class="kpi-card ${client.cobertura>=1?'up':'down'}"><div class="kpi-label">Cobertura</div><div class="kpi-value">${client.cobertura.toFixed(2)}x</div></div>
+        <div class="kpi-card warn"><div class="kpi-label">Ha Totales</div><div class="kpi-value">${fmtNum(client.lotes.reduce((s,l)=>s+l.ha,0))}</div></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◉</span> Panel de Sensorización</div>
+          <table class="tbl">
+            <thead><tr><th>Lote</th><th>Cultivo</th><th>Siembra</th><th>Cond.</th><th>Estrés</th><th class="num">NDVI</th></tr></thead>
+            <tbody>
+              ${client.lotes.map(l=>`<tr>
+                <td>${l.name}</td>
+                <td style="color:${CROPS[l.crop]?.color||'#fff'}">${CROPS[l.crop]?.label||l.crop}</td>
+                <td style="font-family:var(--font-mono);font-size:12px">${l.siembra}</td>
+                <td><span class="pill ${l.cond==='excellent'||l.cond==='good'?'green':l.cond==='fair'?'yellow':'red'}"><span class="dot"></span>${condLabel(l.cond)}</span></td>
+                <td><span style="color:${wsColor(l.ws)}">${wsLabel(l.ws)}</span></td>
+                <td class="num" style="font-family:var(--font-mono)">${l.ndvi.toFixed(2)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">📈</span> Evolución Reciente (90 días)</div>
+          <div class="mini-chart">${trendSVG}</div>
+          <div style="font-size:11px;color:var(--bold-gray-3)">Índice de condición promedio de lotes del cliente. Fuente: sensorización BoldOS.</div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon" style="color:var(--sig-alert)">⚠</span> Alertas Activas (${alerts.length})</div>
+          ${alerts.length?alerts.map(a=>`<div class="alert-item ${a.type}">
+            <span class="a-icon">${a.icon}</span>
+            <div><div class="a-text">${a.text}</div><div class="a-action">→ ${a.action}</div></div>
+          </div>`).join(''):'<div style="color:var(--bold-gray-3);font-size:13px;padding:12px">Sin alertas activas. Operación dentro de parámetros normales.</div>'}
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◆</span> Factores del Score</div>
+          ${[{label:'Rendimiento vs Benchmark',val:client.score>=70?'Por encima':'Por debajo',good:client.score>=70},{label:'Rotación de Cultivos',val:client.lotes.every(l=>l.rotation)?'Activa':'Parcial/No',good:client.lotes.every(l=>l.rotation)},{label:'Estrés Hídrico',val:client.lotes.some(l=>l.ws==='high')?'Alto':'Controlado',good:!client.lotes.some(l=>l.ws==='high')},{label:'Historial Crediticio',val:client.historial.charAt(0).toUpperCase()+client.historial.slice(1),good:client.historial==='excelente'||client.historial==='bueno'},{label:'Cobertura Productiva',val:client.cobertura.toFixed(2)+'x',good:client.cobertura>=1}].map(f=>`
+            <div class="sem-item" style="margin-bottom:6px"><div class="sem-dot" style="background:${f.good?'var(--sig-up)':'var(--sig-down)'}"></div><span class="lbl">${f.label}</span><span class="val" style="color:${f.good?'var(--sig-up)':'var(--sig-down)'}">${f.val}</span></div>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+    ${badgeHTML()}
+  `;
+  el.querySelector('#f-client-eval').addEventListener('change',e=>renderEvaluacion(el,parseInt(e.target.value)));
+}
+
+// ── VIEW 4: CARTERA ──
+function renderCartera(el){
+  const totalExp=CLIENTS.reduce((s,c)=>s+c.creditoTomado,0);
+  const totalCap=CLIENTS.reduce((s,c)=>s+clientCapProd(c),0);
+  const avgCob=CLIENTS.reduce((s,c)=>s+c.cobertura,0)/CLIENTS.length;
+  const redCount=CLIENTS.filter(c=>c.score<40).length;
+  const yellowCount=CLIENTS.filter(c=>c.score>=40&&c.score<55).length;
+  const greenCount=CLIENTS.filter(c=>c.score>=75).length;
+  const orangeCount=CLIENTS.filter(c=>c.score>=55&&c.score<75).length;
+
+  // Donut SVG
+  const donutData=[{label:'Bajo Riesgo',count:greenCount,color:'var(--sig-up)'},{label:'Moderado',count:orangeCount,color:'var(--sig-warn)'},{label:'Elevado',count:yellowCount,color:'var(--sig-alert)'},{label:'Crítico',count:redCount,color:'var(--sig-down)'}];
+  const total=CLIENTS.length;
+  let cumAngle=0;
+  const donutArcs=donutData.filter(d=>d.count>0).map(d=>{
+    const frac=d.count/total;const start=cumAngle;cumAngle+=frac*360;
+    const end=cumAngle;const large=frac>.5?1:0;
+    const sr=start*Math.PI/180,er=end*Math.PI/180;
+    const r=40,cx=50,cy=50;
+    const x1=cx+r*Math.cos(sr),y1=cy+r*Math.sin(sr);
+    const x2=cx+r*Math.cos(er),y2=cy+r*Math.sin(er);
+    return `<path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z" fill="${d.color}" opacity=".85"/>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div class="hud-bracket">
+      <div class="section-title">Seguimiento de Cartera</div>
+      <div class="section-sub">Monitoreá tu portfolio agro con señales en tiempo real. Actuá antes del default.</div>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-card cyan"><div class="kpi-label">Clientes</div><div class="kpi-value">${CLIENTS.length}</div></div>
+      <div class="kpi-card warn"><div class="kpi-label">Exposición Crediticia</div><div class="kpi-value">${fmtUSD(totalExp)}</div></div>
+      <div class="kpi-card up"><div class="kpi-label">Capacidad Productiva Total</div><div class="kpi-value">${fmtUSD(totalCap)}</div></div>
+      <div class="kpi-card ${avgCob>=1?'up':'down'}"><div class="kpi-label">Cobertura Promedio</div><div class="kpi-value">${avgCob.toFixed(2)}x</div></div>
+    </div>
+    <div class="grid-map-right">
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◉</span> Mapa de Cartera</div>
+          <div id="map-container"></div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon" style="color:var(--sig-down)">⚠</span> Alertas con Acción Sugerida</div>
+          ${CLIENTS.filter(c=>c.cobertura<1||c.score<40).map(c=>`
+            <div class="alert-item ${c.cobertura<1?'red':'orange'}">
+              <span class="a-icon">${c.cobertura<1?'🔴':'🟠'}</span>
+              <div>
+                <div class="a-text"><strong>${c.name}</strong> — Cobertura ${c.cobertura.toFixed(2)}x ${c.cobertura<1?'(por debajo de 1.0x)':''}, Score ${c.score}/100.</div>
+                <div class="a-action">→ ${c.cobertura<1?'Contactar para renegociar condiciones':'Solicitar garantía adicional'}</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="card-title"><span class="icon">◎</span> Distribución por Semáforo</div>
+          <div class="donut-wrap">
+            <svg viewBox="0 0 100 100" width="140" height="140" style="transform:rotate(-90deg)">${donutArcs}</svg>
+            <div class="donut-legend">
+              ${donutData.map(d=>`<div class="donut-legend-item"><div class="dlc" style="background:${d.color}"></div>${d.label}: <strong>${d.count}</strong></div>`).join('')}
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="icon">📊</span> Clientes</div>
+          <div class="tbl-scroll" style="max-height:340px">
+            <table class="tbl" id="cartera-table" style="table-layout:fixed">
+              <thead><tr><th style="width:35%">Cliente</th><th style="width:25%">Depto.</th><th class="num" style="width:13%">Score</th><th class="num" style="width:17%">Crédito</th><th class="num" style="width:10%">Cob.</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${badgeHTML()}
+  `;
+
+  // Populate cartera table
+  const tbody=el.querySelector('#cartera-table tbody');
+  CLIENTS.sort((a,b)=>a.score-b.score).forEach(c=>{
+    const pill=scorePill(c.score);
+    tbody.innerHTML+=`<tr style="cursor:pointer" onclick="drillClient(${c.id})">
+      <td style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${c.name}</td><td>${c.depto}</td>
+      <td class="num" style="font-family:var(--font-mono);color:${scoreColor(c.score)}">${c.score}</td>
+      <td class="num">${fmtUSD(c.creditoTomado)}</td>
+      <td class="num" style="color:${c.cobertura>=1?'var(--sig-up)':'var(--sig-down)'}">${c.cobertura.toFixed(2)}x</td>
+    </tr>`;
+  });
+
+  // Map
+  setTimeout(()=>{
+    initMap('map-container');
+    if(!map)return;
+    CLIENTS.forEach(c=>{
+      const coords=DEPTO_COORDS[c.depto];
+      if(!coords)return;
+      const col=c.score>=75?'#00e676':c.score>=55?'#ffd740':c.score>=40?'#ff9100':'#ff5252';
+      const m=L.circleMarker(coords,{radius:12,fillColor:col,fillOpacity:.5,color:col,weight:2,opacity:.7}).addTo(map);
+      m.bindPopup(`<div style="font-family:var(--font-body);font-size:13px"><strong>${c.name}</strong><br>Score: ${c.score}/100<br>Cobertura: ${c.cobertura.toFixed(2)}x<br>Crédito: ${fmtUSD(c.creditoTomado)}</div>`);
+      mapLayers.push(m);
+    });
+    map.fitBounds(CLIENTS.map(c=>DEPTO_COORDS[c.depto]).filter(Boolean),{padding:[30,30]});
+  },300);
+}
+
+// ── DRILL-DOWN (from Cartera table) ──
+window.drillClient=function(id){
+  switchView('precalificacion');
+  setTimeout(()=>renderPrecalificacion(document.getElementById('view-precalificacion'),id),50);
+};
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+document.getElementById('header-date').textContent=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'});
+const initHash=location.hash.slice(1);
+if(views.includes(initHash)){switchView(initHash);}else{renderView('oportunidad');}
+</script>
+</body>
+</html>
